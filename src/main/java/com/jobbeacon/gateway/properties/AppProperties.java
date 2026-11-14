@@ -1,16 +1,13 @@
 package com.jobbeacon.gateway.properties;
 
 import java.util.List;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
 
-@Slf4j
 @ConfigurationProperties("app")
 public record AppProperties(
         Firebase firebase,
     Cors cors,
-    String internalSecret,
     List<String> publicPaths,
     List<String> publicGetPaths) {
 
@@ -39,10 +36,6 @@ public record AppProperties(
       throw new IllegalStateException("app.firebase.project-id must not be blank");
     }
     cors = cors == null ? new Cors(List.of()) : cors;
-    if (!StringUtils.hasText(internalSecret)) {
-      log.warn("(AppProperties) app.internal-secret is empty; downstream services will reject requests");
-      internalSecret = "";
-    }
     publicPaths =
         publicPaths == null || publicPaths.isEmpty()
             ? DEFAULT_PUBLIC_PATHS

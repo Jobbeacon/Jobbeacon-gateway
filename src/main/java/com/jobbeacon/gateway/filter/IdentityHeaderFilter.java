@@ -1,13 +1,11 @@
 package com.jobbeacon.gateway.filter;
 
 import com.jobbeacon.gateway.constant.GatewayHeaders;
-import com.jobbeacon.gateway.properties.AppProperties;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -22,13 +20,10 @@ import reactor.core.publisher.Mono;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class IdentityHeaderFilter implements GlobalFilter, Ordered {
 
   private static final String USER_PREFIX_LOWER =
       GatewayHeaders.USER_PREFIX.toLowerCase(Locale.ROOT);
-
-  private final AppProperties appProperties;
 
   @Override
   public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -51,9 +46,7 @@ public class IdentityHeaderFilter implements GlobalFilter, Ordered {
     List<String> toRemove =
         headers.keySet().stream()
             .filter(
-                name ->
-                    name.toLowerCase(Locale.ROOT).startsWith(USER_PREFIX_LOWER)
-                        || name.equalsIgnoreCase(GatewayHeaders.INTERNAL_SECRET))
+name -> name.toLowerCase(Locale.ROOT).startsWith(USER_PREFIX_LOWER))
             .toList();
     toRemove.forEach(headers::remove);
     headers.remove(HttpHeaders.AUTHORIZATION);
@@ -75,10 +68,6 @@ public class IdentityHeaderFilter implements GlobalFilter, Ordered {
       }
       setIfPresent(headers, GatewayHeaders.USER_PICTURE, jwt.getClaimAsString("picture"));
       log.debug("(rewriteHeaders) identity headers set for uid: {}", jwt.getSubject());
-    }
-
-    if (StringUtils.hasText(appProperties.internalSecret())) {
-      headers.set(GatewayHeaders.INTERNAL_SECRET, appProperties.internalSecret());
     }
   }
 

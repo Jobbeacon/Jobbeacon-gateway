@@ -11,9 +11,9 @@ Spring Cloud Gateway (Spring Boot 3.3, Java 21, WebFlux). It is the **only publi
 
 1. Client sends `Authorization: Bearer <Firebase ID token>` to the gateway.
 2. Gateway verifies the token against Google's public keys (issuer `https://securetoken.google.com/<FIREBASE_PROJECT_ID>`, audience = project id). No service-account file is needed.
-3. Gateway **removes every client-sent `X-User-*` and `X-Internal-Secret` header** (also on public routes) and removes `Authorization`.
-4. For authenticated requests it adds `X-User-Id`, `X-User-Role`, `X-User-Email`, `X-User-Email-Verified`, `X-User-Name`, `X-User-Picture` (avatar URL from the `picture` claim, raw); on every forwarded request it adds `X-Internal-Secret`.
-5. Backend/rcm do not verify Firebase tokens; they trust these headers and must reject requests with a missing or wrong `X-Internal-Secret`. Missing `X-User-Id` means anonymous.
+3. Gateway **removes every client-sent `X-User-*` header** (also on public routes) and removes `Authorization`.
+4. For authenticated requests it adds `X-User-Id`, `X-User-Role`, `X-User-Email`, `X-User-Email-Verified`, `X-User-Name`, `X-User-Picture` (avatar URL from the `picture` claim, raw).
+5. Backend/rcm do not verify Firebase tokens; they trust these headers as-is (there is no shared secret), so network isolation is the only protection. Missing `X-User-Id` means anonymous.
 
 Invalid/missing tokens on protected paths get a JSON 401/403 (`status`, `message`, `data`, `timestamp`).
 
@@ -28,7 +28,6 @@ On a public endpoint a valid token still adds the `X-User-*` headers; an invalid
 ### Requirements for downstream services
 - Set `server.forward-headers-strategy: framework` so `X-Forwarded-*` from the gateway are honoured (correct scheme/host in redirects, Swagger, links).
 - Decode `X-User-Name` with `URLDecoder.decode(value, StandardCharsets.UTF_8)` — the gateway form-URL-encodes it (UTF-8, space → `+`).
-- Use the same `GATEWAY_INTERNAL_SECRET` value as the gateway.
 
 ## Configuration
 
@@ -37,7 +36,6 @@ On a public endpoint a valid token still adds the `X-User-*` headers; an invalid
 | `FIREBASE_PROJECT_ID`     | Firebase project id. **Required outside the `local` profile** — the app fails fast at startup if blank. The `local` profile falls back to `jobbeacon-local`. |
 | `BACKEND_URL`, `RCM_URL`  | Downstream base URLs. |
 | `CORS_ORIGINS`            | Comma-separated allowed origins (default `http://localhost:3000` when running locally; under docker-compose an unset value means empty). **Empty = all cross-origin requests are blocked.** CORS is handled only at the gateway; downstream services should not add CORS headers. |
-| `GATEWAY_INTERNAL_SECRET` | Shared secret sent as `X-Internal-Secret`. Required outside `local`. |
 | `SERVER_PORT`             | Default `8088`. |
 | `PROFILE_ACTIVE`          | Default `local`. |
 
@@ -51,7 +49,7 @@ Ports: gateway `8088`, backend `8081`, rcm `8082` (override with `BACKEND_URL` /
 # backend on 8081 (in ../Jobbeacon-be), rcm on 8082, then:
 mvn spring-boot:run                         # profile "local"
 # or
-FIREBASE_PROJECT_ID=your-project GATEWAY_INTERNAL_SECRET=dev-secret mvn spring-boot:run
+FIREBASE_PROJECT_ID=your-project mvn spring-boot:run
 ```
 
 Other commands:
@@ -64,4 +62,4 @@ docker build -t jobbeacon-gateway .
 
 ## Docker Compose
 
-The full stack (gateway, backend, recommendation, infrastructure) is defined in `../infras-deployment/docker-compose.yml`. The gateway is published on `${GATEWAY_PORT:-8088}`; backend has no host port and is reachable only through the gateway. Set `FIREBASE_PROJECT_ID` and `GATEWAY_INTERNAL_SECRET` in `../infras-deployment/.env`.
+The full stack (gateway, backend, recommendation, infrastructure) is defined in `../infras-deployment/docker-compose.yml`. The gateway is published on `${GATEWAY_PORT:-8088}`; backend has no host port and is reachable only through the gateway. Set `FIREBASE_PROJECT_ID` in `../infras-deployment/.env`.
