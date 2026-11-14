@@ -1,0 +1,93 @@
+server:
+  port: ${SERVER_PORT:8088}
+
+spring:
+  application:
+    name: jobbeacon-gateway
+  profiles:
+    active: ${PROFILE_ACTIVE:local}
+  # Local KEY=VALUE env file (git-ignored); OS environment variables still take precedence.
+  config:
+    import: optional:file:.env[.properties]
+  cloud:
+    gateway:
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
+      # X-Forwarded-* headers are added by default; backend needs server.forward-headers-strategy: framework
+      x-forwarded:
+        enabled: true
+      httpclient:
+        connect-timeout: 3000
+        response-timeout: 60s
+      routes:
+        # SSE chat: no response timeout so long streams are not cut after 60s
+        - id: backend-chat-stream
+          uri: ${BACKEND_URL:http://localhost:8081}
+          order: -1
+          predicates:
+            - Path=/api/v1/chat/stream
+          metadata:
+            response-timeout: -1
+        - id: backend-api-docs
+          uri: ${BACKEND_URL:http://localhost:8081}
+          order: -1
+          predicates:
+            - Path=/api/v1/v3/api-docs/**
+          filters:
+            - RewritePath=/api/v1/v3/api-docs(?<segment>/?.*), /v3/api-docs${segment}
+        - id: recommendation-api-docs
+          uri: ${RCM_URL:http://localhost:8082}
+          order: -1
+          predicates:
+            - Path=/api/rcm/v3/api-docs/**
+          filters:
+            - RewritePath=/api/rcm/v3/api-docs(?<segment>/?.*), /v3/api-docs${segment}
+        - id: backend
+          uri: ${BACKEND_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/**
+        # rcm keeps its own /api/rcm context path; add StripPrefix here if that changes
+        - id: recommendation
+          uri: ${RCM_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/rcm/**
+
+app:
+  firebase:
+    project-id: ${FIREBASE_PROJECT_ID:}
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
+  internal-secret: ${GATEWAY_INTERNAL_SECRET:}
+  public-paths:
+    - /actuator/health
+    - /actuator/info
+    - /api/v1/health
+    - /swagger-ui.html
+    - /swagger-ui/**
+    - /v3/api-docs/**
+    - /api/v1/v3/api-docs/**
+    - /api/rcm/v3/api-docs/**
+  # GET-only public endpoints; must mirror the permitAll GET rules in Jobbeacon-be SecurityConfiguration.
+  public-get-paths:
+    - /api/v1/jobs
+    - /api/v1/jobs/**
+    - /api/v1/locations/**
+    - /api/v1/categories
+    - /api/v1/companies
+    - /api/v1/companies/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+---
+# Local profile only: fallback project id so the app starts without env; other profiles fail fast (blank -> AppProperties validation).
+spring:
+  config:
+    activate:
+      on-profile: local
+app:
+  firebase:
+    project-id: ${FIREBASE_PROJECT_ID:jobbeacon-local}
