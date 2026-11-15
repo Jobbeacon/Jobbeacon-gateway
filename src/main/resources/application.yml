@@ -22,64 +22,61 @@ spring:
       routes:
         # SSE chat: no response timeout so long streams are not cut after 60s
         - id: backend-chat-stream
-          uri: ${BACKEND_URL:http://localhost:8081}
+          uri: lb://${BACKEND_SERVICE_ID:jobbeacon-be}
           order: -1
           predicates:
-            - Path=/api/v1/chat/stream
+            - Path=/jobbeacon-be/api/v1/chat/stream
           metadata:
             response-timeout: -1
-        - id: backend-api-docs
-          uri: ${BACKEND_URL:http://localhost:8081}
-          order: -1
-          predicates:
-            - Path=/api/v1/v3/api-docs/**
-          filters:
-            - RewritePath=/api/v1/v3/api-docs(?<segment>/?.*), /v3/api-docs${segment}
-        - id: recommendation-api-docs
-          uri: ${RCM_URL:http://localhost:8082}
-          order: -1
-          predicates:
-            - Path=/api/rcm/v3/api-docs/**
-          filters:
-            - RewritePath=/api/rcm/v3/api-docs(?<segment>/?.*), /v3/api-docs${segment}
         - id: backend
-          uri: ${BACKEND_URL:http://localhost:8081}
+          uri: lb://${BACKEND_SERVICE_ID:jobbeacon-be}
           predicates:
-            - Path=/api/v1/**
-        # rcm keeps its own /api/rcm context path; add StripPrefix here if that changes
+            - Path=/jobbeacon-be/api/**,/jobbeacon-be/v3/api-docs/**,/jobbeacon-be/swagger-ui.html,/jobbeacon-be/swagger-ui/**,/jobbeacon-be/actuator/health
         - id: recommendation
-          uri: ${RCM_URL:http://localhost:8082}
+          uri: lb://${RECOMMENDATION_SERVICE_ID:jobbeacon-recommendation}
           predicates:
-            - Path=/api/rcm/**
+            - Path=/jobbeacon-recommendation/api/**,/jobbeacon-recommendation/actuator/health
 
 app:
   firebase:
     project-id: ${FIREBASE_PROJECT_ID:}
   cors:
-    allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
+    allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:5173}
   public-paths:
     - /actuator/health
     - /actuator/info
-    - /api/v1/health
-    - /swagger-ui.html
-    - /swagger-ui/**
-    - /v3/api-docs/**
-    - /api/v1/v3/api-docs/**
-    - /api/rcm/v3/api-docs/**
-  # GET-only public endpoints; must mirror the permitAll GET rules in Jobbeacon-be SecurityConfiguration.
+    - /jobbeacon-be/actuator/health
+    - /jobbeacon-be/api/v1/health
+    - /jobbeacon-be/swagger-ui.html
+    - /jobbeacon-be/swagger-ui/**
+    - /jobbeacon-be/v3/api-docs/**
+    - /jobbeacon-recommendation/actuator/health
+    - /jobbeacon-recommendation/api/v1/health
+  # GET-only public endpoints (no token needed). Backend endpoints that don't read X-User-Id must be listed here.
   public-get-paths:
-    - /api/v1/jobs
-    - /api/v1/jobs/**
-    - /api/v1/locations/**
-    - /api/v1/categories
-    - /api/v1/companies
-    - /api/v1/companies/**
+    - /jobbeacon-be/api/v1/jobs
+    - /jobbeacon-be/api/v1/jobs/**
+    - /jobbeacon-be/api/v1/locations/**
+    - /jobbeacon-be/api/v1/categories
+    - /jobbeacon-be/api/v1/companies
+    - /jobbeacon-be/api/v1/companies/**
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+
+eureka:
+  client:
+    enabled: ${EUREKA_ENABLED:true}
+    # Reactive app: talk to the registry with WebClient instead of RestTemplate.
+    webclient:
+      enabled: true
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
 
 ---
 # Local profile only: fallback project id so the app starts without env; other profiles fail fast (blank -> AppProperties validation).

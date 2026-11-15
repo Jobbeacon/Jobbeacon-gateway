@@ -2,10 +2,14 @@
 
 Spring Cloud Gateway (Spring Boot 3.3, Java 21, WebFlux). It is the **only public entry point** of JobBeacon.
 
-| Path          | Forwarded to                  | Env var       | Local default           |
-|---------------|-------------------------------|---------------|-------------------------|
-| `/api/v1/**`  | backend (`Jobbeacon-be`)      | `BACKEND_URL` | `http://localhost:8081` |
-| `/api/rcm/**` | recommendation service (rcm)  | `RCM_URL`     | `http://localhost:8082` |
+| Path | Forwarded to | Route URI |
+|---|---|---|
+| `/jobbeacon-be/api/**` (+ Swagger, health) | backend (`Jobbeacon-be`) | `lb://jobbeacon-be` |
+| `/jobbeacon-recommendation/api/**` (+ health) | recommendation service (rcm) | `lb://jobbeacon-recommendation` |
+
+There are no fixed downstream URLs: the gateway is a Eureka client of `../Jobbeacon-discovery`, and `lb://<name>` routes are resolved to a registered instance by the Spring Cloud load balancer. A service that is not registered (yet) answers 503 through the gateway.
+
+Every service serves under its own context path (= `spring.application.name`), so the gateway forwards paths unchanged. Only the listed sub-paths are routed: `/<service>/internal/**` is not reachable through the gateway.
 
 ## Auth flow (decision B2)
 
@@ -17,13 +21,13 @@ Spring Cloud Gateway (Spring Boot 3.3, Java 21, WebFlux). It is the **only publi
 
 Invalid/missing tokens on protected paths get a JSON 401/403 (`status`, `message`, `data`, `timestamp`).
 
-Public endpoints (no token needed) are configured in `application.yml` and must mirror the backend's `permitAll` rules:
+Public endpoints (no token needed) are configured in `application.yml` and must cover every backend endpoint that does not read `X-User-Id`:
 - `app.public-paths` — any method: health, actuator, swagger / api-docs.
-- `app.public-get-paths` — GET only: `/api/v1/jobs/**`, `/api/v1/locations/**`, `/api/v1/categories`, `/api/v1/companies/**`.
+- `app.public-get-paths` — GET only: `/jobbeacon-be/api/v1/jobs/**`, `/jobbeacon-be/api/v1/locations/**`, `/jobbeacon-be/api/v1/categories`, `/jobbeacon-be/api/v1/companies/**`.
 
 On a public endpoint a valid token still adds the `X-User-*` headers; an invalid or expired token is treated as anonymous instead of 401.
 
-> **Warning:** backend and rcm must NOT be reachable from outside the internal network. Anyone who can reach them directly can forge identity headers. In docker-compose they only use `expose`, never `ports`.
+> **Warning:** backend and rcm must NOT be reachable from outside the internal network. Anyone who can reach them directly can forge identity headers. In docker-compose their ports are bound to `127.0.0.1` only.
 
 ### Requirements for downstream services
 - Set `server.forward-headers-strategy: framework` so `X-Forwarded-*` from the gateway are honoured (correct scheme/host in redirects, Swagger, links).
@@ -34,8 +38,9 @@ On a public endpoint a valid token still adds the `X-User-*` headers; an invalid
 | Variable                  | Meaning |
 |---------------------------|---------|
 | `FIREBASE_PROJECT_ID`     | Firebase project id. **Required outside the `local` profile** — the app fails fast at startup if blank. The `local` profile falls back to `jobbeacon-local`. |
-| `BACKEND_URL`, `RCM_URL`  | Downstream base URLs. |
-| `CORS_ORIGINS`            | Comma-separated allowed origins (default `http://localhost:3000` when running locally; under docker-compose an unset value means empty). **Empty = all cross-origin requests are blocked.** CORS is handled only at the gateway; downstream services should not add CORS headers. |
+| `EUREKA_URL`              | Discovery server, default `http://localhost:8761/eureka/` (`http://discovery:8761/eureka/` in docker-compose). |
+| `BACKEND_SERVICE_ID`, `RECOMMENDATION_SERVICE_ID` | Eureka names used in the route URIs, default `jobbeacon-be` / `jobbeacon-recommendation`. |
+| `CORS_ORIGINS`            | Comma-separated allowed origins (default `http://localhost:3000,http://localhost:5173` when running locally; under docker-compose an unset value means empty). **Empty = all cross-origin requests are blocked.** CORS is handled only at the gateway; downstream services should not add CORS headers. |
 | `SERVER_PORT`             | Default `8088`. |
 | `PROFILE_ACTIVE`          | Default `local`. |
 
@@ -43,10 +48,10 @@ On a public endpoint a valid token still adds the `X-User-*` headers; an invalid
 
 ## Run locally
 
-Ports: gateway `8088`, backend `8081`, rcm `8082` (override with `BACKEND_URL` / `RCM_URL`).
+Ports: gateway `8088`, discovery `8761`. Backend and rcm can run on any port: the gateway finds them through discovery.
 
 ```bash
-# backend on 8081 (in ../Jobbeacon-be), rcm on 8082, then:
+# discovery (../Jobbeacon-discovery), backend and rcm running and registered, then:
 mvn spring-boot:run                         # profile "local"
 # or
 FIREBASE_PROJECT_ID=your-project mvn spring-boot:run

@@ -15,21 +15,22 @@ public record AppProperties(
       List.of(
           "/actuator/health",
           "/actuator/info",
-          "/api/v1/health",
-          "/swagger-ui.html",
-          "/swagger-ui/**",
-          "/v3/api-docs/**",
-          "/api/v1/v3/api-docs/**",
-          "/api/rcm/v3/api-docs/**");
+          "/jobbeacon-be/actuator/health",
+          "/jobbeacon-be/api/v1/health",
+          "/jobbeacon-be/swagger-ui.html",
+          "/jobbeacon-be/swagger-ui/**",
+          "/jobbeacon-be/v3/api-docs/**",
+          "/jobbeacon-recommendation/actuator/health",
+          "/jobbeacon-recommendation/api/v1/health");
 
   public static final List<String> DEFAULT_PUBLIC_GET_PATHS =
       List.of(
-          "/api/v1/jobs",
-          "/api/v1/jobs/**",
-          "/api/v1/locations/**",
-          "/api/v1/categories",
-          "/api/v1/companies",
-          "/api/v1/companies/**");
+          "/jobbeacon-be/api/v1/jobs",
+          "/jobbeacon-be/api/v1/jobs/**",
+          "/jobbeacon-be/api/v1/locations/**",
+          "/jobbeacon-be/api/v1/categories",
+          "/jobbeacon-be/api/v1/companies",
+          "/jobbeacon-be/api/v1/companies/**");
 
   public AppProperties {
     if (firebase == null || !StringUtils.hasText(firebase.projectId())) {
