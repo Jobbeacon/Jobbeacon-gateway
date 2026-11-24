@@ -45,6 +45,7 @@ app:
   public-paths:
     - /actuator/health
     - /actuator/info
+    - /actuator/prometheus
     - /jobbeacon-be/actuator/health
     - /jobbeacon-be/api/v1/health
     - /jobbeacon-be/swagger-ui.html
@@ -65,7 +66,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
 
 eureka:
   client:
