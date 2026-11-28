@@ -36,6 +36,18 @@ spring:
           uri: lb://${RECOMMENDATION_SERVICE_ID:jobbeacon-recommendation}
           predicates:
             - Path=/jobbeacon-recommendation/api/**,/jobbeacon-recommendation/actuator/health
+        # SSE notifications: no response timeout, or the stream is closed after the global 60s
+        - id: notification-stream
+          uri: lb://${NOTIFICATION_SERVICE_ID:jobbeacon-notification}
+          order: -1
+          predicates:
+            - Path=/jobbeacon-notification/api/v1/me/notifications/stream
+          metadata:
+            response-timeout: -1
+        - id: notification
+          uri: lb://${NOTIFICATION_SERVICE_ID:jobbeacon-notification}
+          predicates:
+            - Path=/jobbeacon-notification/api/**
 
 app:
   firebase:
